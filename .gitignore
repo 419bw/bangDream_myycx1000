@@ -1,7 +1,54 @@
+# IDE / editor
 .idea/
-venv/
-qqbot-master/
+.vscode/
+*.swp
+*.swo
 
-# Python cache
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python environments
+.venv/
+venv/
+env/
+ENV/
+pythonenv*
+
+# Python cache / tooling
 __pycache__/
 *.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Logs
+*.log
+
+# Local config / secrets
+.env
+.env.*
+!.env.example
+config.json
+*/config.json
+
+# Archives
+*.zip
+
+# External / unrelated folder
+qqbot-master/
+
+# Runtime-generated project files
+cache_data/
+*/cache_data/
+*/tasks/
+*/current_event_temp*.csv
+*/current_event_info*.json
+*/event_types_cache.json
+*/latest_event_cache.json
