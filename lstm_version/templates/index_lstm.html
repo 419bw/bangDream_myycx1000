@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BangDream 活动预测 (LSTM)</title>
+    <!-- 引入 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #e91e63;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 200px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #e91e63;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #c2185b;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid #e91e63;
+            color: #e91e63;
+        }
+
+        .btn-outline:hover {
+            background-color: #fce4ec;
+        }
+
+        /* Sidebar Styles */
+        .settings-sidebar {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .settings-sidebar.open {
+            right: 0;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .settings-group {
+            margin-bottom: 15px;
+        }
+
+        .settings-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .settings-group input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            display: none;
+        }
+
+        /* 调试面板样式 */
+        .debug-panel {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fff8e1;
+            border-radius: 8px;
+            border: 1px solid #ffe082;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .debug-header {
+            margin: 0;
+            color: #f57c00;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            user-select: none;
+        }
+
+        .debug-content {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .range-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            accent-color: #f57c00;
+        }
+
+        #result {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .info-box {
+            background: #fff0f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 5px solid #e91e63;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .info-item {
+            margin: 5px 0;
+        }
+
+        .last-updated {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+            width: 100%;
+            text-align: right;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 500px;
+            width: 100%;
+            margin-bottom: 30px;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+
+        .loading-container {
+            display: none;
+            margin-top: 25px;
+            text-align: center;
+        }
+
+        .progress-wrapper {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin-top: 10px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff80ab, #e91e63);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            box-shadow: 0 2px 5px rgba(233, 30, 99, 0.4);
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(233, 30, 99, 0.3);
+            border-radius: 50%;
+            border-top-color: #e91e63;
+            animation: spin 1s ease-in-out infinite;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="overlay" onclick="closeSettings()"></div>
+
+    <!-- Settings Sidebar -->
+    <div class="settings-sidebar" id="settingsSidebar">
+        <div class="sidebar-header">
+            <h3>⚙️ 参数设置</h3>
+            <button onclick="closeSettings()" class="btn-outline" style="padding: 5px 10px;">✕</button>
+        </div>
+        <div id="settingsForm">
+            <!-- Populated via JS -->
+            <p>正在加载配置...</p>
+        </div>
+        <div style="margin-top: 20px; text-align: center;">
+            <button onclick="saveSettings()">保存并生效</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>🎸 BangDream 活动预测 (LSTM)</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            基于 单一 LSTM + 动态冲刺指数放大 模型每10分钟自动更新预测数据<br>
+            <span style="font-size: 0.9em; color: #888;">(紫色虚线代表历史预测值的变化趋势)</span>
+        </p>
+
+        <!-- 输入框区域 -->
+        <div class="input-group">
+            <input type="number" id="eventId" placeholder="自动检测中..." readonly>
+            <button onclick="forceRefresh()" id="btnPredict">立即刷新</button>
+            <button onclick="openSettings()" class="btn-outline">设置</button>
+        </div>
+
+        <!-- 调试选项 -->
+        <div class="debug-panel">
+            <div class="debug-header" onclick="toggleDebug()">
+                <span>🔧 调试/回测选项 (点击展开)</span>
+                <span id="debugArrow" style="margin-left: auto;">▼</span>
+            </div>
+            <div class="debug-content" id="debugContent">
+                <div style="margin-bottom: 8px;">
+                    <label for="dataRange" style="font-weight: bold;">使用数据量: <span id="dataRangeVal"
+                            style="color:#e91e63; font-size:1.2em;">100</span>%</label>
+                </div>
+                <div class="range-container">
+                    <span style="font-size:12px; color:#888;">5%</span>
+                    <input type="range" id="dataRange" min="5" max="100" value="100"
+                        oninput="updateRangeVal(this.value)">
+                    <span style="font-size:12px; color:#888;">100%</span>
+                </div>
+                <p style="font-size: 13px; color: #666; margin-top: 8px; line-height: 1.5;">
+                    调整此滑块可强制重新计算（忽略缓存），用于测试模型在活动不同阶段的表现。
+                </p>
+            </div>
+        </div>
+
+        <!-- 加载状态 -->
+        <div class="loading-container" id="loadingContainer">
+            <div class="loading-text">
+                <div class="spinner"></div>
+                <span id="loadingStatus">正在检测当前活动...</span>
+                <span id="progressText" style="color:#e91e63; font-weight:bold; margin-left:5px;">0%</span>
+            </div>
+            <div class="progress-wrapper">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+        </div>
+
+        <!-- 结果区域 -->
+        <div id="result">
+            <div class="info-box">
+                <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="info-item">
+                        <h3 id="eventName" style="margin: 0;"></h3>
+                    </div>
+                    <div class="info-item" style="font-size: 1.2em; color: #e91e63;">
+                        <strong>
+                            <!-- 动态标签：最终预测 / 最终结果 -->
+                            <span id="resultLabel">最终预测</span>:
+                            <span id="finalPt"></span>
+                        </strong>
+                    </div>
+                </div>
+                <div
+                    style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                    <div class="info-item">类型: <span id="eventType" style="font-weight:bold;"></span></div>
+                    <div class="last-updated" id="lastUpdatedTime"></div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="predictionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let myChart = null;
+        let pollInterval = null;
+
+        function toggleDebug() {
+            const content = document.getElementById('debugContent');
+            const arrow = document.getElementById('debugArrow');
+            if (content.style.display === 'block') {
+                content.style.display = 'none';
+                arrow.innerText = '▼';
+            } else {
+                content.style.display = 'block';
+                arrow.innerText = '▲';
+            }
+        }
+
+        function updateRangeVal(val) { document.getElementById('dataRangeVal').innerText = val; }
+
+        function openSettings() {
+            document.querySelector('.overlay').style.display = 'block';
+            document.getElementById('settingsSidebar').classList.add('open');
+            fetchSettings();
+        }
+
+        function closeSettings() {
+            document.querySelector('.overlay').style.display = 'none';
+            document.getElementById('settingsSidebar').classList.remove('open');
+        }
+
+        async function fetchSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const config = await res.json();
+                const form = document.getElementById('settingsForm');
+                form.innerHTML = '';
+
+                // Fields to show
+                const fields = [
+                    { key: 'TARGET_EVENT_ID', label: '目标活动 ID (Target Event ID)' },
+                    { key: 'WINDOW_SIZE', label: '窗口大小 (Window Size)' },
+                    { key: 'MAX_HOURLY_SPEED', label: '最大时速限制 (Max Hourly Speed)' },
+                    { key: 'ASYM_UNDER_WEIGHT', label: '低估惩罚权重 (Under Weight)' },
+                    { key: 'ASYM_OVER_WEIGHT', label: '高估惩罚权重 (Over Weight)' },
+                    { key: 'END_DURATION_HOURS', label: '冲刺阶段时长 (End Hours)' }
+                ];
+
+                fields.forEach(field => {
+                    const div = document.createElement('div');
+                    div.className = 'settings-group';
+                    div.innerHTML = `
+                        <label>${field.label}</label>
+                        <input type="text" name="${field.key}" value="${config[field.key] || ''}">
+                    `;
+                    form.appendChild(div);
+                });
+            } catch (e) {
+                document.getElementById('settingsForm').innerText = '加载配置失败';
+            }
+        }
+
+        async function saveSettings() {
+            const inputs = document.querySelectorAll('#settingsForm input');
+            const newConfig = {};
+            inputs.forEach(input => {
+                newConfig[input.name] = input.value;
+            });
+
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('保存成功！下次预测将应用新配置。');
+                    closeSettings();
+                } else {
+                    alert('保存失败');
+                }
+            } catch (e) {
+                alert('请求错误');
+            }
+        }
+
+        window.onload = async function () { await initPage(); };
+
+        async function initPage() {
+            const eventIdInput = document.getElementById('eventId');
+            try {
+                const res = await fetch('/current_event');
+                const data = await res.json();
+                if (data.success && data.event_id) {
+                    eventIdInput.value = data.event_id;
+                    await tryFetchCachedResult(data.event_id);
+                } else {
+                    eventIdInput.readOnly = false;
+                    eventIdInput.placeholder = "输入活动 ID";
+                }
+            } catch (e) { console.error(e); eventIdInput.readOnly = false; }
+        }
+
+        async function tryFetchCachedResult(eventId) {
+            const loadingContainer = document.getElementById('loadingContainer');
+            loadingContainer.style.display = 'block';
+            document.getElementById('loadingStatus').innerText = "检查最新数据...";
+
+            try {
+                const res = await fetch(`/latest_result?event_id=${eventId}`);
+                const data = await res.json();
+                loadingContainer.style.display = 'none';
+                if (data.success && data.result) renderResult(data.result);
+                else { console.log("无缓存，开始计算..."); forceRefresh(); }
+            } catch (e) {
+                console.error("Fetch cache failed", e);
+                loadingContainer.style.display = 'none';
+            }
+        }
+
+        async function forceRefresh() { startPredict(); }
+
+        async function startPredict() {
+            const eventId = document.getElementById('eventId').value;
+            const cutoffPercentage = document.getElementById('dataRange').value;
+            const btn = document.getElementById('btnPredict');
+            const loadingContainer = document.getElementById('loadingContainer');
+            const progressBar = document.getElementById('progressBar');
+            const loadingStatus = document.getElementById('loadingStatus');
+            const progressText = document.getElementById('progressText');
+            const resultDiv = document.getElementById('result');
+
+            if (!eventId) { alert('请输入活动 ID'); return; }
+
+            btn.disabled = true; btn.innerText = "计算中...";
+            resultDiv.style.opacity = "0.5";
+            loadingContainer.style.display = 'block';
+            progressBar.style.width = '0%'; progressText.innerText = '0%'; loadingStatus.innerText = "提交任务...";
+
+            try {
+                const startResponse = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event_id: eventId, cutoff_percentage: parseInt(cutoffPercentage) })
+                });
+
+                if (!startResponse.ok) throw new Error(`HTTP error! status: ${startResponse.status}`);
+                const startData = await startResponse.json();
+                if (!startData.success) throw new Error(startData.error || '任务启动失败');
+
+                const taskId = startData.task_id;
+                pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(`/status/${taskId}`);
+                        const statusData = await statusRes.json();
+                        if (!statusData.success) throw new Error(statusData.error || "未知错误");
+
+                        const pct = statusData.progress;
+                        progressBar.style.width = pct + '%';
+                        progressText.innerText = pct + '%';
+                        loadingStatus.innerText = statusData.message;
+
+                        if (statusData.status === 'completed') {
+                            clearInterval(pollInterval);
+                            setTimeout(() => {
+                                loadingContainer.style.display = 'none';
+                                btn.innerText = "立即刷新";
+                                btn.disabled = false;
+                                resultDiv.style.opacity = "1";
+                                renderResult(statusData.result);
+                            }, 500);
+                        } else if (statusData.status === 'failed') {
+                            throw new Error(statusData.error);
+                        }
+                    } catch (e) {
+                        clearInterval(pollInterval);
+                        alert('预测失败: ' + e.message);
+                        loadingContainer.style.display = 'none';
+                        btn.innerText = "重试";
+                        btn.disabled = false;
+                        resultDiv.style.opacity = "1";
+                    }
+                }, 1000);
+            } catch (err) {
+                alert('请求出错: ' + err.message);
+                loadingContainer.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        function renderResult(data) {
+            const resultDiv = document.getElementById('result');
+            document.getElementById('eventName').innerText = data.event_name;
+            document.getElementById('eventType').innerText = data.event_type;
+
+            // 智能修复：如果后端返回的 final_pt 为 0，尝试从实际数据中获取最新值
+            let displayPt = parseInt(data.final_pt);
+            const hasActual = data.chart_data && data.chart_data.actual && data.chart_data.actual.length > 0;
+            const hasPredict = data.chart_data && data.chart_data.predict && data.chart_data.predict.length > 0;
+
+            if (!displayPt && hasActual) {
+                const lastActual = data.chart_data.actual[data.chart_data.actual.length - 1];
+                displayPt = lastActual.y;
+            }
+            document.getElementById('finalPt').innerText = displayPt.toLocaleString();
+
+            // 动态标签：如果活动已结束（后端标记）或 没有预测数据（暗示结束或仅显示实际），显示“最终结果”
+            const resultLabel = document.getElementById('resultLabel');
+            if (data.is_ended || (!hasPredict && hasActual)) {
+                resultLabel.innerText = "最终结果" + (data.is_ended ? " (活动已结束)" : " (实际值)");
+                resultLabel.style.color = "#333";
+            } else {
+                resultLabel.innerText = "最终预测";
+                resultLabel.style.color = ""; // 默认
+            }
+
+            if (data.updated_at) {
+                const diffMins = Math.floor((new Date() - new Date(data.updated_at)) / 60000);
+                document.getElementById('lastUpdatedTime').innerText = `最后更新: ${new Date(data.updated_at).toLocaleString()} (${diffMins}分钟前)`;
+            }
+            resultDiv.style.display = 'block';
+            if (typeof Chart !== 'undefined') renderChart(data.chart_data);
+        }
+
+        function renderChart(chartData) {
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+
+            const combinedData = [];
+            if (chartData.actual) combinedData.push(...chartData.actual);
+            if (chartData.predict) {
+                chartData.predict.forEach(p => {
+                    if (combinedData.length === 0 || p.x > combinedData[combinedData.length - 1].x) combinedData.push(p);
+                });
+            }
+
+            // 计算每日增量
+            const dailyGains = [];
+            if (combinedData.length > 0) {
+                let lastDateStr = new Date(combinedData[0].x).toLocaleDateString();
+                let lastPt = combinedData[0].y;
+                for (let i = 1; i < combinedData.length; i++) {
+                    const p = combinedData[i];
+                    const dateStr = new Date(p.x).toLocaleDateString();
+                    if (dateStr !== lastDateStr) {
+                        dailyGains.push({
+                            timestamp: p.x, pt: p.y, diff: p.y - lastPt,
+                            dateString: new Date(p.x).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+                        });
+                        lastDateStr = dateStr; lastPt = p.y;
+                    }
+                }
+
+                // === 新增：计算活动结束日当天的增量 ===
+                // 逻辑：获取数据中最后一个点（即活动结束时间点或最新预测点）
+                // 减去 当天0点（即 lastPt，因为循环结束时 lastPt 正好停留在最后一天的0点数据上）
+                const lastPoint = combinedData[combinedData.length - 1];
+                const lastPointDateStr = new Date(lastPoint.x).toLocaleDateString();
+
+                // 确认最后一个点确实属于最后一天（防止跨天逻辑遗漏）
+                if (lastPointDateStr === lastDateStr) {
+                    dailyGains.push({
+                        timestamp: lastPoint.x,
+                        pt: lastPoint.y,
+                        diff: lastPoint.y - lastPt,
+                        dateString: "Last Day" // 标记，虽然该逻辑不显示日期
+                    });
+                }
+            }
+
+            const dailyGainPlugin = {
+                id: 'dailyGainPlugin',
+                // 使用 afterDraw 确保绘制在最上层，并且允许绘制在 chartArea 外部
+                afterDraw(chart) {
+                    const { ctx, chartArea: { top, left, right }, scales: { x } } = chart;
+                    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+
+                    // 将标签绘制在 Grid 上方一点点 (top - 25)
+                    // 之前是 top - 35 或 20 (绝对位置)，现在改为相对于绘图区
+                    const boxY = top - 25;
+
+                    dailyGains.forEach(gain => {
+                        const xPos = x.getPixelForValue(gain.timestamp);
+                        // 只绘制在横向范围内的标签
+                        if (xPos < left || xPos > right) return;
+
+                        const gainText = `+${Math.round(gain.diff / 10000)}w`;
+
+                        const textWidth = ctx.measureText(gainText).width;
+                        const boxWidth = Math.max(textWidth, 40) + 10;
+                        const boxX = xPos - boxWidth / 2;
+
+                        ctx.fillStyle = 'rgba(233, 30, 99, 0.1)';
+                        ctx.strokeStyle = 'rgba(233, 30, 99, 0.3)';
+                        ctx.lineWidth = 1;
+
+                        ctx.beginPath();
+                        ctx.roundRect(boxX, boxY, boxWidth, 20, 4);
+                        ctx.fill(); ctx.stroke();
+
+                        ctx.fillStyle = '#e91e63';
+                        ctx.font = 'bold 11px sans-serif';
+                        ctx.fillText(gainText, xPos, boxY + 4);
+                    });
+                    ctx.restore();
+                }
+            };
+
+            if (myChart) myChart.destroy();
+
+            const datasets = [
+                { label: '实际数据', data: chartData.actual, borderColor: '#1f77b4', backgroundColor: '#1f77b4', borderWidth: 2, pointRadius: 0, tension: 0.1 }
+            ];
+
+            if (chartData.predict && chartData.predict.length > 0) {
+                datasets.push({
+                    label: '预测趋势', data: chartData.predict, borderColor: '#ff7f0e', backgroundColor: '#ff7f0e', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, tension: 0.1
+                });
+            }
+
+            // 修改历史预测显示：不稀疏点，使用虚线，隐藏中间点
+            let historyData = chartData.history_preds || [];
+            if (historyData.length > 0) {
+                datasets.push({
+                    label: '历史预测演变',
+                    data: historyData, // 使用完整数据
+                    borderColor: '#9c27b0',
+                    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5], // 虚线效果
+
+                    // 动态设置点半径：只有首尾显示，中间不显示(radius=0)
+                    pointRadius: (ctx) => {
+                        const idx = ctx.dataIndex;
+                        const count = ctx.dataset.data.length;
+                        return (idx === 0 || idx === count - 1) ? 2 : 0;
+                    },
+                    // 鼠标悬停时只在首尾显示大圈
+                    pointHoverRadius: (ctx) => {
+                        const idx = ctx.dataIndex;
+                        const count = ctx.dataset.data.length;
+                        return (idx === 0 || idx === count - 1) ? 3 : 0;
+                    },
+
+                    tension: 0.2,
+                    order: 10
+                });
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                plugins: [dailyGainPlugin],
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    // 减少顶部 Padding (之前是 60，现在改为 35)
+                    layout: {
+                        padding: {
+                            top: 35,
+                            right: 30,
+                            left: 10,
+                            bottom: 0
+                        }
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+                    plugins: {
+                        // 标题移到底部
+                        title: { display: true, text: 'PT 趋势 & 预测收敛曲线', position: 'bottom' },
+                        // 图例移到底部
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)', padding: 10,
+                            callbacks: {
+                                label: function (context) { return (context.dataset.label || '') + ': ' + (context.parsed.y !== null ? context.parsed.y.toLocaleString() : ''); },
+                                afterBody: function (tooltipItems) {
+                                    const item = tooltipItems[0];
+                                    const dataIndex = item.dataIndex;
+                                    const dataset = item.dataset.data;
+                                    // 仅对非隐藏点计算速度，防止大量计算？
+                                    // 实际上 ChartJS tooltip 是按需计算的，这里逻辑保持不变即可
+                                    if (dataIndex > 0) {
+                                        const diffPt = dataset[dataIndex].y - dataset[dataIndex - 1].y;
+                                        const diffTime = dataset[dataIndex].x - dataset[dataIndex - 1].x;
+                                        if (diffTime > 0) return `时速: ${Math.round((diffPt / diffTime) * 3600000).toLocaleString()} PT/hr`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'MM/dd' } }, title: { display: true, text: '时间' } },
+                        y: { title: { display: true, text: 'PT 点数' }, ticks: { callback: function (value) { return value / 10000 + 'w'; } } }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

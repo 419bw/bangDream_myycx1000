@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+event_data
+cache_data
+tasks
+models_lstm
+current_event_*.csv
+current_event_*.json
+.env
+.idea
+venv

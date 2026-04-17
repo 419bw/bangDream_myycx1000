@@ -1,0 +1,7 @@
+.idea/
+venv/
+qqbot-master/
+
+# Python cache
+__pycache__/
+*.py[cod]

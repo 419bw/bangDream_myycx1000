@@ -1,0 +1,33 @@
+name: ycx-predictor
+
+services:
+  lightgm:
+    build: 
+      context: ./lightGM_version
+      dockerfile: Dockerfile
+    container_name: lightgm_server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./lightGM_version:/app
+    restart: always
+
+  lstm:
+    build: 
+      context: ./lstm_version
+      dockerfile: Dockerfile
+    container_name: lstm_server
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./lstm_version:/app
+    restart: always
+
+  qqbot:
+    build: 
+      context: ./qqbot-master
+      dockerfile: Dockerfile
+    container_name: qqbot_server
+    volumes:
+      - ./qqbot-master:/app
+    restart: always
