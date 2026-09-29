@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  nonebot:
+    build: .
+    container_name: nenobot_container
+    restart: always
+    # 挂载目录，这样你修改代码或配置后重启容器即可生效，不用重新构建
+    volumes:
+      - ./:/app
+      # 如果有本地存储的数据，建议也挂载出来
+      # - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+      # 如果需要设置 NoneBot 的环境变量，可以在这里添加
+      # - ENVIRONMENT=prod
+    ports:
+      # 如果你的 bot 需要对外暴露端口 (比如 webhook)，请解开注释
+      # - "8080:8080"
+    network_mode: "host" # 使用 host 模式通常能减少很多网络连接问题

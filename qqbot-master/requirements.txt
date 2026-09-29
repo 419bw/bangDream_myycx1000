@@ -1,0 +1,10 @@
+nonebot2[fastapi,httpx,websockets]
+nonebot-adapter-qq
+pydantic
+httpx
+python-dotenv
+loguru
+Pillow
+matplotlib
+numpy
+bestdori-api

@@ -41,8 +41,6 @@ config.json
 # Archives
 *.zip
 
-# External / unrelated folder
-qqbot-master/
 
 # Runtime-generated project files
 cache_data/
